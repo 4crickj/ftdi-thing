@@ -62,6 +62,10 @@ public class SerialActivity extends Activity {
 			ftdi_device.close();
 	}
 	
+	/*
+	 * Detects if the FTDI cable exists, sets up the correct
+	 * options and creates the reader thread.
+	 */
 	private void refreshDevice()
 	{
 		if(reader != null)
@@ -233,11 +237,15 @@ public class SerialActivity extends Activity {
 			term.append(line);
 	}
 	
+	/*
+	 * Thread which reads from the FTDI cable and prints it to the screen.
+	 * Started from refreshDevices();
+	 */
 	private class ReaderThread extends Thread
 	{
 		public void run() {
-			final byte[] buf = new byte[10];
-			final char[] charBuf = new char[10];
+			final byte[] buf = new byte[1000];
+			final char[] charBuf = new char[1000];
 			
 			for(;;) {
 				try 
@@ -246,11 +254,11 @@ public class SerialActivity extends Activity {
 				}
 				catch (InterruptedException e) { }
 				
+				if(ftdi_device == null) {
+					return;
+				}
+				
 				synchronized(ftdi_device) {
-					if(ftdi_device == null) {
-						return;
-					}
-					
 					if(ftdi_device.isOpen()) {
 						int t = ftdi_device.getQueueStatus();
 						final int i = t > buf.length ? buf.length : t;

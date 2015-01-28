@@ -18,9 +18,13 @@ import android.content.Intent;
 import com.ftdi.j2xx.D2xxManager;
 import com.ftdi.j2xx.D2xxManager.D2xxException;
 
+/* The main activity which allows running the avrdude command. */
 public class MainActivity extends Activity {
 	
+	// Default hex file location
 	String hexFile = "/data/data/jackpal.androidterm/local/bin/boot.hex";
+	
+	// Path to the avrdude executable
 	String avrdude = "/data/data/jackpal.androidterm/local/bin/avrdude -c c232hm -p m644p -U flash:w:";
 	
 	D2xxManager ftdi_manager;
