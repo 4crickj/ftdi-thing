@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android" >
+    
+    <ListPreference android:key="serial_baud" android:defaultValue="9600" android:title="Baud rate" android:entryValues="@array/pref_baud" android:entries="@array/pref_baud"/><CheckBoxPreference android:defaultValue="true" android:key="serial_break" android:summaryOn="On" android:title="Break on" android:summaryOff="Off" />
+    <ListPreference android:entryValues="@array/pref_data_bits" android:key="serial_data_bits" android:defaultValue="7" android:entries="@array/pref_data_bits" android:title="Data bits"/>
+    <ListPreference android:entryValues="@array/pref_stop_bits" android:key="serial_stop_bits" android:defaultValue="1" android:entries="@array/pref_stop_bits" android:title="Stop bits"/>
+    <ListPreference android:entryValues="@array/pref_parity" android:key="serial_parity" android:defaultValue="None" android:entries="@array/pref_parity" android:title="Parity"/>
+    <ListPreference android:entryValues="@array/pref_flow" android:key="serial_flow" android:defaultValue="None" android:entries="@array/pref_flow" android:title="Flow control"/>
+    
+
+</PreferenceScreen>

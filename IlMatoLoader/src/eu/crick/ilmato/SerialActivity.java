@@ -2,7 +2,9 @@ package eu.crick.ilmato;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.preference.PreferenceManager;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -18,17 +20,55 @@ import com.ftdi.j2xx.D2xxManager.D2xxException;
  * from the FTDI device in UART mode.
  * 
  * Connect the yellow and orange wires together to form a loopback device.
+ * 
+ * To cross over:
+ * 
+ * Yellow -> Orange
+ * Green -> Brown
+ * Purple -> Grey
  */
 public class SerialActivity extends Activity {
 	
 	D2xxManager ftdi_manager;
 	FT_Device ftdi_device;
 	EditText term;
+	Thread reader;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_serial);
+		
+		
+	}
+	
+	@Override
+	protected void onStart()
+	{
+		super.onStart();
+		
+		refreshDevice();
+	}
+	
+	@Override
+	protected void onStop()
+	{
+		super.onStop();
+		
+		if(reader != null)
+			reader.interrupt();
+		
+		if(ftdi_device != null)
+			ftdi_device.close();
+	}
+	
+	private void refreshDevice()
+	{
+		if(reader != null)
+			reader.interrupt();
+		
+		if(ftdi_device != null)
+			ftdi_device.close();
 		
 		term = (EditText) findViewById(R.id.terminalText);
 		
@@ -45,16 +85,66 @@ public class SerialActivity extends Activity {
 			ftdi_device = null;
 		}
 		
+		Button send = (Button) findViewById(R.id.sendButton);
+		
 		if(ftdi_device == null) {
 			appendTerminalLine("No devices present", true);
-			Button send = (Button) findViewById(R.id.sendButton);
 			send.setEnabled(false);
 		} else {
 			appendTerminalLine("Device loaded", true);
 			
+			send.setEnabled(true);
+			
+			SharedPreferences pref = PreferenceManager.getDefaultSharedPreferences(this);
+			
+			int bd = Integer.parseInt(pref.getString("serial_baud", "9600"));
+			ftdi_device.setBaudRate(bd);
+			
+			if(pref.getBoolean("serial_break", true)) {
+				ftdi_device.setBreakOn();
+			} else {
+				ftdi_device.setBreakOff();
+			}
+			
+			String db = pref.getString("serial_data_bits", "7");
+			byte data_bits = D2xxManager.FT_DATA_BITS_8;
+			
+			if(db.equals("7")) {
+				data_bits = D2xxManager.FT_DATA_BITS_7;
+			}
+			
+			String sb = pref.getString("serial_stop_bits", "1");
+			byte stop_bits = D2xxManager.FT_STOP_BITS_1;
+			
+			if(sb.equals("2")) {
+				stop_bits = D2xxManager.FT_STOP_BITS_2;
+			}
+			
+			String p = pref.getString("serial_parity", "None");
+			byte parity = D2xxManager.FT_PARITY_NONE;
+			
+			if(p.equals("Odd")) {
+				parity = D2xxManager.FT_PARITY_ODD;
+			} else if(p.equals("Even")) {
+				parity = D2xxManager.FT_PARITY_EVEN;
+			}
+			
+			ftdi_device.setDataCharacteristics(data_bits, stop_bits, parity);
+			
+			String fc = pref.getString("serial_flow", "None");
+			short flow = D2xxManager.FT_FLOW_NONE;
+			
+			if(fc.equals("RTS CTS")) {
+				flow = D2xxManager.FT_FLOW_RTS_CTS;
+			} else if(fc.equals("DTR DSR")) {
+				flow = D2xxManager.FT_FLOW_DTR_DSR;
+			}
+			
+			ftdi_device.setFlowControl(flow, (byte) 0, (byte) 0);
+			
 			// Continuous thread to read the Rx buffer on the device
 			// and write it to screen.
-			new Thread(new Runnable() {
+			reader = new Thread(new Runnable() {
 				public void run() {
 					final byte[] buf = new byte[100];
 					
@@ -64,6 +154,10 @@ public class SerialActivity extends Activity {
 							Thread.sleep(10);
 						}
 						catch (InterruptedException e) { }
+						
+						if(ftdi_device == null) {
+							break;
+						}
 						
 						if(ftdi_device.isOpen()) {
 							int i = ftdi_device.getQueueStatus();
@@ -85,7 +179,9 @@ public class SerialActivity extends Activity {
 						}
 					}
 				}
-			}).start();
+			});
+			
+			reader.start();
 		}
 	}
 
@@ -108,6 +204,11 @@ public class SerialActivity extends Activity {
 			
 			return true;
 		}
+		
+		if(id == R.id.action_refresh) {
+			refreshDevice();
+		}
+		
 		return super.onOptionsItemSelected(item);
 	}
 	
