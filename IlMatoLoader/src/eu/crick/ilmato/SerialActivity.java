@@ -144,43 +144,7 @@ public class SerialActivity extends Activity {
 			
 			// Continuous thread to read the Rx buffer on the device
 			// and write it to screen.
-			reader = new Thread(new Runnable() {
-				public void run() {
-					final byte[] buf = new byte[100];
-					
-					for(;;) {
-						try 
-						{
-							Thread.sleep(10);
-						}
-						catch (InterruptedException e) { }
-						
-						if(ftdi_device == null) {
-							break;
-						}
-						
-						if(ftdi_device.isOpen()) {
-							int i = ftdi_device.getQueueStatus();
-							
-							if(i > 0) {
-								if (i > buf.length){
-									i = buf.length;
-								}
-								
-								ftdi_device.read(buf, i, 100); //todo read i bytes
-								ftdi_device.purge(D2xxManager.FT_PURGE_RX);
-								
-								term.post(new Runnable() {	// This method is needed as Views
-									public void run() {		// are not thread safe
-										appendTerminalLine(new String(buf));
-									}
-								});
-							}
-						}
-					}
-				}
-			});
-			
+			reader = new ReaderThread();
 			reader.start();
 		}
 	}
@@ -218,18 +182,41 @@ public class SerialActivity extends Activity {
 	 */
 	public void onSendClick(View v) {
 		EditText line_input = (EditText) findViewById(R.id.sendText);
-		String line = line_input.getText().toString();
+		final String line = line_input.getText().toString();
 		
 		appendTerminalLine("Sent \"" + line + "\"", true);
 		line_input.setText("");
 		
-		ftdi_device.write(line.getBytes());
+		Thread writer = new Thread() {
+			public void run()
+			{
+				byte[] buf = line.getBytes();
+				byte[] c = new byte[1];
+				
+				
+				//try {
+					//for(int i = 0; i < buf.length; i++) {
+						//c[0] = buf[i];
+						
+						synchronized(ftdi_device) {
+							ftdi_device.write(buf);
+						}
+						//Thread.sleep(20);
+					//}
+					//ftdi_device.purge(D2xxManager.FT_PURGE_TX);
+				//} catch(InterruptedException e) { }
+			}
+		};
+		
+		writer.start();
+		
 	}
 	
 	/*
 	 * Appends text to the terminal box.
 	 */
-	private void appendTerminalLine(String line) {
+	private void appendTerminalLine(String line)
+	{
 		appendTerminalLine(line, false);
 	}
 	
@@ -238,10 +225,54 @@ public class SerialActivity extends Activity {
 	 * text will be prepended by and identifier indicating
 	 * information text.
 	 */
-	private void appendTerminalLine(String line, boolean info) {
+	private void appendTerminalLine(String line, boolean info)
+	{
 		if(info)
 			term.append("> " + line + "\n");
 		else
 			term.append(line);
+	}
+	
+	private class ReaderThread extends Thread
+	{
+		public void run() {
+			final byte[] buf = new byte[10];
+			final char[] charBuf = new char[10];
+			
+			for(;;) {
+				try 
+				{
+					Thread.sleep(10);
+				}
+				catch (InterruptedException e) { }
+				
+				synchronized(ftdi_device) {
+					if(ftdi_device == null) {
+						return;
+					}
+					
+					if(ftdi_device.isOpen()) {
+						int t = ftdi_device.getQueueStatus();
+						final int i = t > buf.length ? buf.length : t;
+						
+						if(i > 0) {
+							ftdi_device.read(buf, i); //todo read i bytes
+							ftdi_device.purge(D2xxManager.FT_PURGE_RX);
+							
+							for(int j = 0; j < i; j++) {
+								charBuf[j] = (char) buf[j];
+							}
+							
+							term.post(new Runnable() {	// This method is needed as Views
+								public void run() {		// are not thread safe
+									appendTerminalLine(String.copyValueOf(charBuf, 0, i));
+									
+								}
+							});
+						}
+					}
+				}
+			}
+		}
 	}
 }
